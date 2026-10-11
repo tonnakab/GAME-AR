@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สร้างไฟล์ targets.mind</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;font-family:'Kanit',sans-serif;background:#10142a;color:#fff;padding:24px}
+  .box{max-width:560px;margin:auto}
+  #drop{border:3px dashed #ffffff55;border-radius:16px;padding:30px;text-align:center;cursor:pointer}
+  #drop.over{border-color:#ff9800;background:#ff980014}
+  #preview{max-width:100%;max-height:360px;display:none;margin:16px auto;border-radius:8px}
+  .btn{display:block;width:100%;margin:12px 0;font-family:inherit;font-size:18px;padding:12px;border:none;
+       border-radius:30px;background:#ff9800;color:#fff;font-weight:600;cursor:pointer}
+  .btn:disabled{opacity:.4;cursor:default}
+  #bar{height:12px;background:#ffffff22;border-radius:6px;overflow:hidden}
+  #fill{height:100%;width:0;background:#4caf50;transition:width .2s}
+  #status{margin-top:10px;font-size:15px}
+  ul{font-size:14px;line-height:1.7;opacity:.85}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>สร้างไฟล์ targets.mind</h2>
+  <div id="drop">แตะเพื่อเลือกภาพ หรือลากภาพมาวางที่นี่<br>
+    <small>(PNG / JPG เช่น eclipse-poster.png)</small></div>
+  <input type="file" id="file" accept="image/*" hidden>
+  <img id="preview" alt="ภาพที่เลือก">
+  <button class="btn" id="go" disabled>สร้าง targets.mind</button>
+  <div id="bar"><div id="fill"></div></div>
+  <div id="status">ยังไม่ได้เลือกภาพ</div>
+  <ul>
+    <li>ใช้<b>ภาพเดียวกับที่จะพิมพ์</b>ทุกพิกเซล ถ้าแก้ภาพต้องสร้างไฟล์ใหม่</li>
+    <li>ภาพที่ดีต้องมีรายละเอียดเยอะ คอนทราสต์สูง และไม่สมมาตร</li>
+    <li>ใช้เวลาประมาณ 1–3 นาที ระหว่างนี้อย่าปิดแท็บ</li>
+  </ul>
+</div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const MINDAR_URL = 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';
+let img = null, fileName = '';
+
+const setStatus = (t, p) => { $('status').innerHTML = t; if (p != null) $('fill').style.width = p + '%'; };
+
+function loadFile(f) {
+  if (!f || !f.type.startsWith('image/')) return setStatus('กรุณาเลือกไฟล์ภาพ (PNG หรือ JPG)');
+  fileName = f.name;
+  const url = URL.createObjectURL(f);
+  img = new Image();
+  img.onload = () => {
+    $('preview').src = url; $('preview').style.display = 'block';
+    $('go').disabled = false;
+    const small = Math.min(img.naturalWidth, img.naturalHeight) < 500;
+    setStatus(`เลือกแล้ว: ${fileName} (${img.naturalWidth}×${img.naturalHeight})` +
+      (small ? '<br><b>ภาพเล็กเกินไป ควรกว้างอย่างน้อย 500 px</b>' : ''), 0);
+  };
+  img.src = url;
+}
+
+$('drop').onclick = () => $('file').click();
+$('file').onchange = e => loadFile(e.target.files[0]);
+['dragover','dragenter'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => loadFile(e.dataTransfer.files[0]));
+
+async function getCompiler() {
+  try {
+    const m = await import(MINDAR_URL);
+    return m.Compiler || window.MINDAR?.IMAGE?.Compiler || null;
+  } catch (e) { console.warn(e); return window.MINDAR?.IMAGE?.Compiler || null; }
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  try {
+    setStatus('กำลังโหลดตัวคอมไพล์...', 0);
+    const Compiler = await getCompiler();
+    if (!Compiler) throw new Error('load');
+
+    const compiler = new Compiler();
+    await compiler.compileImageTargets([img], p =>
+      setStatus(`กำลังวิเคราะห์ภาพ... ${p.toFixed(0)}%`, p));
+    const buf = await compiler.exportData();
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([buf]));
+    a.download = 'targets.mind'; a.click();
+    setStatus('เสร็จแล้ว! ได้ไฟล์ <b>targets.mind</b> นำไปไว้ข้าง index.html แล้วอัปโหลดขึ้นเว็บ', 100);
+  } catch (e) {
+    console.error(e);
+    setStatus('สร้างไม่สำเร็จ ลองใช้เว็บ MindAR Image Targets Compiler แทน (ใช้ภาพเดียวกันได้เลย)', 0);
+  } finally {
+    $('go').disabled = false;
+  }
+};
+</script>
+</body>
+</html>

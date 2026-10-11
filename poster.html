@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สร้างโปสเตอร์ | ล่าสุริยุปราคา AR</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<style>
+  body{margin:0;font-family:'Kanit',sans-serif;background:#10142a;color:#fff;display:flex;
+       flex-wrap:wrap;gap:24px;padding:24px;box-sizing:border-box}
+  #side{flex:1 1 300px;max-width:420px}
+  #wrap{flex:1 1 400px}
+  canvas{width:100%;max-width:620px;height:auto;box-shadow:0 8px 30px #0008;display:block}
+  input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:none;font-family:inherit;font-size:14px}
+  .btn{display:block;width:100%;margin:10px 0;font-family:inherit;font-size:17px;padding:12px;border:none;
+       border-radius:30px;background:#ff9800;color:#fff;font-weight:600;cursor:pointer}
+  .btn2{background:#1e88e5}
+  .btn:disabled{opacity:.4;cursor:default}
+  #status{background:#ffffff14;border-radius:10px;padding:10px 12px;font-size:14px}
+  ol{padding-left:20px;line-height:1.7;font-size:14px}
+  @page{size:A4;margin:0}
+  @media print{
+    body{background:#fff;padding:0;display:block}
+    #side{display:none}
+    canvas{max-width:none;width:100%;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<div id="side">
+  <h2 style="margin-top:0">โปสเตอร์ Marker</h2>
+  <label>ลิงก์เกมที่จะใส่ใน QR Code</label>
+  <input id="url" placeholder="https://ชื่อเว็บของคุณ/index.html?openExternalBrowser=1">
+  <button class="btn btn2" id="redraw">อัปเดตโปสเตอร์</button>
+  <button class="btn" id="png">1) ดาวน์โหลดโปสเตอร์ (PNG)</button>
+  <button class="btn" id="mind">2) สร้างไฟล์ targets.mind</button>
+  <button class="btn btn2" id="print">พิมพ์โปสเตอร์</button>
+  <div id="status">กำลังโหลดฟอนต์...</div>
+  <ol>
+    <li>ตรวจว่าลิงก์ด้านบนเป็นลิงก์เกมที่อัปโหลดขึ้นเว็บแล้ว</li>
+    <li>กดปุ่ม 1 เพื่อดาวน์โหลดภาพไว้พิมพ์</li>
+    <li>กดปุ่ม 2 แล้วรอราว 1–3 นาที จะได้ไฟล์ <b>targets.mind</b></li>
+    <li>นำ targets.mind ไปไว้ในโฟลเดอร์เดียวกับ index.html แล้วอัปโหลดขึ้นเว็บอีกครั้ง</li>
+    <li><b>ถ้าแก้ลิงก์ ต้องสร้าง targets.mind ใหม่ทุกครั้ง</b> เพราะ QR Code เป็นส่วนหนึ่งของภาพที่ระบบจดจำ</li>
+  </ol>
+</div>
+<div id="wrap"><canvas id="poster" width="1240" height="1754"></canvas></div>
+
+<script type="module">
+const $ = id => document.getElementById(id);
+const MINDAR_URL = 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js';
+const status = t => $('status').innerHTML = t;
+function rng(seed){ return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+if (location.protocol.startsWith('http'))
+  $('url').value = new URL('index.html?openExternalBrowser=1', location.href).href;
+
+/* ---------- ตัวช่วยวาด ---------- */
+function rrect(g, x, y, w, h, rad, fill, stroke) {
+  g.beginPath(); g.moveTo(x + rad, y);
+  g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad);
+  g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath();
+  if (fill) { g.fillStyle = fill; g.fill(); }
+  if (stroke) { g.strokeStyle = stroke; g.lineWidth = 3; g.stroke(); }
+}
+function txt(g, s, x, y, size, weight, color, maxW) {
+  g.font = `${weight} ${size}px Kanit`;
+  while (maxW && g.measureText(s).width > maxW && size > 12) { size -= 2; g.font = `${weight} ${size}px Kanit`; }
+  g.fillStyle = color; g.fillText(s, x, y);
+}
+function palm(g, x, y, h, r) {
+  g.strokeStyle = '#050816'; g.lineWidth = 10; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 22, y - h / 2, x + 10, y - h); g.stroke();
+  g.fillStyle = '#050816';
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI / 2 + (i - 3) * 0.5 + (r() - 0.5) * 0.2;
+    g.save(); g.translate(x + 10, y - h); g.rotate(a);
+    g.beginPath(); g.ellipse(45, 0, 50, 9, 0.25, 0, 7); g.fill(); g.restore();
+  }
+}
+function pavilion(g, x, y) {
+  g.fillStyle = '#050816';
+  g.fillRect(x - 60, y - 10, 120, 10);
+  for (let i = -50; i <= 50; i += 25) g.fillRect(x + i - 3, y - 70, 6, 60);
+  g.beginPath(); g.moveTo(x - 80, y - 70); g.lineTo(x, y - 140); g.lineTo(x + 80, y - 70); g.fill();
+  g.beginPath(); g.moveTo(x - 45, y - 115); g.lineTo(x, y - 175); g.lineTo(x + 45, y - 115); g.fill();
+  g.fillRect(x - 2, y - 200, 4, 30);
+}
+function drawQR(g, text, x, y, size) {
+  rrect(g, x, y, size, size, 18, '#fff');
+  if (!text || typeof qrcode === 'undefined') {
+    txt(g, 'ใส่ลิงก์เกม', x + 70, y + size / 2, 30, 400, '#333'); return;
+  }
+  const qr = qrcode(0, 'M'); qr.addData(text); qr.make();
+  const n = qr.getModuleCount(), pad = 20, cell = (size - pad * 2) / n;
+  g.fillStyle = '#000';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+    if (qr.isDark(r, c)) g.fillRect(x + pad + c * cell, y + pad + r * cell, Math.ceil(cell), Math.ceil(cell));
+}
+
+/* ---------- วาดโปสเตอร์ ---------- */
+function draw() {
+  const c = $('poster'), g = c.getContext('2d'), W = c.width, H = c.height, r = rng(2411);
+
+  // ท้องฟ้า + พื้นล่าง
+  const skyG = g.createLinearGradient(0, 0, 0, 1150);
+  skyG.addColorStop(0, '#03061f'); skyG.addColorStop(.55, '#0f2463');
+  skyG.addColorStop(.85, '#4a2a6e'); skyG.addColorStop(1, '#d9774a');
+  g.fillStyle = skyG; g.fillRect(0, 0, W, 1150);
+  g.fillStyle = '#070a1c'; g.fillRect(0, 1150, W, H - 1150);
+
+  // ดาว
+  for (let i = 0; i < 1100; i++) {
+    const x = r() * W, y = r() * 1050, big = r() < 0.06, s = big ? 2.5 + r() * 3 : 0.6 + r() * 1.6;
+    g.fillStyle = `rgba(255,${225 + r() * 30 | 0},${190 + r() * 65 | 0},${0.45 + r() * 0.55})`;
+    g.beginPath(); g.arc(x, y, s, 0, 7); g.fill();
+    if (big) {
+      g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x - s * 4, y); g.lineTo(x + s * 4, y);
+      g.moveTo(x, y - s * 4); g.lineTo(x, y + s * 4); g.stroke();
+    }
+  }
+
+  // กลุ่มดาว
+  for (let k = 0; k < 6; k++) {
+    let x = 60 + r() * (W - 120), y = 320 + r() * 560;
+    const pts = [[x, y]];
+    g.strokeStyle = 'rgba(150,190,255,.55)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(x, y);
+    const n = 4 + (r() * 3 | 0);
+    for (let i = 0; i < n; i++) { x += (r() - .5) * 230; y += (r() - .5) * 170; g.lineTo(x, y); pts.push([x, y]); }
+    g.stroke();
+    g.fillStyle = '#fff';
+    pts.forEach(([px, py]) => { g.beginPath(); g.arc(px, py, 5, 0, 7); g.fill(); });
+  }
+
+  // สุริยุปราคาเต็มดวง + โคโรนา + แหวนเพชร
+  const ex = 820, ey = 600, R = 170;
+  const halo = g.createRadialGradient(ex, ey, R * 0.9, ex, ey, R * 2.1);
+  halo.addColorStop(0, 'rgba(255,245,215,.95)'); halo.addColorStop(.35, 'rgba(255,205,140,.35)');
+  halo.addColorStop(1, 'rgba(255,170,90,0)');
+  g.fillStyle = halo; g.beginPath(); g.arc(ex, ey, R * 2.1, 0, 7); g.fill();
+  for (let i = 0; i < 160; i++) {
+    const a = r() * Math.PI * 2, L = R * (1.15 + r() * 1.0);
+    g.strokeStyle = `rgba(255,${210 + r() * 45 | 0},170,${0.15 + r() * 0.4})`; g.lineWidth = 1 + r() * 3;
+    g.beginPath(); g.moveTo(ex + Math.cos(a) * R, ey + Math.sin(a) * R);
+    g.lineTo(ex + Math.cos(a) * L, ey + Math.sin(a) * L); g.stroke();
+  }
+  g.fillStyle = '#010208'; g.beginPath(); g.arc(ex, ey, R, 0, 7); g.fill();
+  const da = -2.3, dx = ex + Math.cos(da) * R, dy = ey + Math.sin(da) * R;
+  const dr = g.createRadialGradient(dx, dy, 0, dx, dy, 60);
+  dr.addColorStop(0, '#fff'); dr.addColorStop(.3, 'rgba(255,255,230,.6)'); dr.addColorStop(1, 'rgba(255,255,200,0)');
+  g.fillStyle = dr; g.beginPath(); g.arc(dx, dy, 60, 0, 7); g.fill();
+
+  // ลำดับการบัง (ก่อน → เต็มดวง → หลัง)
+  [-1.6, -1.0, -0.45, 0, 0.5, 1.1, 1.7].forEach((o, i) => {
+    const x = 110 + i * 170, y = 960 - Math.sin(i / 6 * Math.PI) * 60, rr = 46;
+    g.fillStyle = '#ffcc4d'; g.beginPath(); g.arc(x, y, rr, 0, 7); g.fill();
+    g.fillStyle = o === 0 ? '#010208' : '#14123a';
+    g.beginPath(); g.arc(x + o * rr, y - o * rr * 0.25, rr * 1.04, 0, 7); g.fill();
+    if (o === 0) { g.strokeStyle = 'rgba(255,240,200,.9)'; g.lineWidth = 4; g.beginPath(); g.arc(x, y, rr + 3, 0, 7); g.stroke(); }
+  });
+
+  // ทะเล
+  const sea = g.createLinearGradient(0, 1150, 0, 1260);
+  sea.addColorStop(0, '#2a2350'); sea.addColorStop(1, '#070a1c');
+  g.fillStyle = sea; g.fillRect(0, 1150, W, 110);
+  g.strokeStyle = 'rgba(255,200,150,.35)'; g.lineWidth = 2;
+  for (let i = 0; i < 40; i++) {
+    const y = 1160 + r() * 90, x = r() * W, l = 20 + r() * 90;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + l, y); g.stroke();
+  }
+
+  // ภูเขา ชายหาด ต้นมะพร้าว พลับพลา
+  g.fillStyle = '#050816'; g.beginPath(); g.moveTo(0, 1160);
+  let hx = 0, hy = 1080; g.lineTo(0, hy);
+  while (hx < 520) { hx += 20 + r() * 40; hy = Math.max(980, Math.min(1150, hy + (r() - .55) * 50)); g.lineTo(hx, hy); }
+  g.lineTo(620, 1160); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(0, 1260); g.lineTo(0, 1215);
+  g.quadraticCurveTo(W * 0.5, 1185, W, 1230); g.lineTo(W, 1260); g.fill();
+  [[700, 1215, 190], [790, 1210, 150], [1080, 1225, 210], [1150, 1228, 130]].forEach(([x, y, h]) => palm(g, x, y, h, r));
+  pavilion(g, 930, 1208);
+
+  // ชื่อเกม
+  txt(g, 'ล่าสุริยุปราคา', 70, 170, 118, 600, '#fff', 760);
+  txt(g, 'ECLIPSE HUNTER  ·  AR GAME', 76, 232, 40, 600, '#ffd54a');
+
+  // แถบข้อมูล
+  rrect(g, 60, 1290, W - 120, 170, 26, 'rgba(255,255,255,.08)', 'rgba(255,213,74,.8)');
+  txt(g, 'วันวิทยาศาสตร์แห่งชาติ · 18 สิงหาคม', 100, 1365, 56, 600, '#ffd54a', W - 200);
+  txt(g, 'สุริยุปราคาเต็มดวง ณ หว้ากอ จ.ประจวบคีรีขันธ์ · พ.ศ. 2411', 100, 1420, 32, 400, '#e8ecff', W - 200);
+
+  // วิธีเล่น + QR
+  txt(g, 'วิธีเล่น', 80, 1550, 46, 600, '#fff');
+  txt(g, '1. สแกน QR Code ด้วยกล้องมือถือ', 80, 1605, 32, 400, '#e8ecff', 740);
+  txt(g, '2. เลือก "ส่องโปสเตอร์ AR" แล้วกดอนุญาตใช้กล้อง', 80, 1650, 32, 400, '#e8ecff', 740);
+  txt(g, '3. ส่องภาพนี้ แล้วลากนิ้วเพื่อจัดดวงจันทร์', 80, 1695, 32, 400, '#e8ecff', 740);
+  drawQR(g, $('url').value.trim(), W - 360, 1480, 300);
+
+  // กรอบ + ขีดแบบไม่สมมาตร (ช่วยให้ระบบจับภาพแม่นขึ้น)
+  g.strokeStyle = 'rgba(255,213,74,.9)'; g.lineWidth = 6; g.strokeRect(24, 24, W - 48, H - 48);
+  g.lineWidth = 2;
+  for (let x = 40; x < W - 40; x += 30) {
+    const l = (x % 150 < 30) ? 22 : (r() < 0.3 ? 14 : 8);
+    g.beginPath(); g.moveTo(x, 24); g.lineTo(x, 24 + l); g.stroke();
+  }
+  for (let y = 40; y < H - 40; y += 30) {
+    const l = (y % 210 < 30) ? 22 : (r() < 0.3 ? 14 : 8);
+    g.beginPath(); g.moveTo(24, y); g.lineTo(24 + l, y); g.stroke();
+  }
+}
+
+function download(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/* ---------- ปุ่มต่าง ๆ ---------- */
+$('redraw').onclick = () => { draw(); status('อัปเดตโปสเตอร์แล้ว (ถ้าเคยสร้าง targets.mind ไว้ ต้องสร้างใหม่)'); };
+$('png').onclick = () => $('poster').toBlob(b => download(b, 'eclipse-poster.png'), 'image/png');
+$('print').onclick = () => window.print();
+
+$('mind').onclick = async () => {
+  const btns = document.querySelectorAll('.btn');
+  btns.forEach(b => b.disabled = true);
+  try {
+    status('กำลังโหลดตัวคอมไพล์...');
+    let Compiler = null;
+    try {
+      const m = await import(MINDAR_URL);
+      Compiler = m.Compiler || (window.MINDAR && window.MINDAR.IMAGE && window.MINDAR.IMAGE.Compiler);
+    } catch (e) { console.warn(e); }
+    if (!Compiler) throw new Error('load');
+
+    const img = new Image();
+    img.src = $('poster').toDataURL('image/png');
+    await img.decode();
+
+    const compiler = new Compiler();
+    await compiler.compileImageTargets([img], p => status(`กำลังสร้าง targets.mind... ${p.toFixed(0)}%`));
+    const buf = await compiler.exportData();
+    download(new Blob([buf]), 'targets.mind');
+    status('เสร็จแล้ว! นำ <b>targets.mind</b> ไปไว้ข้าง index.html แล้วอัปโหลดขึ้นเว็บอีกครั้ง');
+  } catch (e) {
+    console.error(e);
+    status('สร้างในหน้านี้ไม่สำเร็จ ให้กดปุ่ม 1 เพื่อดาวน์โหลด PNG แล้วอัปโหลดภาพเข้า ' +
+           '<b>MindAR Image Targets Compiler</b> (เว็บทางการของ MindAR) แทน ได้ไฟล์แบบเดียวกัน');
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+};
+
+/* ---------- เริ่มต้น: รอฟอนต์ไทยโหลดก่อนวาด ---------- */
+try {
+  await Promise.all([
+    document.fonts.load('600 40px Kanit', 'กA'),
+    document.fonts.load('400 40px Kanit', 'กA')
+  ]);
+} catch {}
+draw();
+status($('url').value ? 'พร้อมใช้งาน' : 'กรุณาใส่ลิงก์เกม แล้วกด "อัปเดตโปสเตอร์"');
+</script>
+</body>
+</html>

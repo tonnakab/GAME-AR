@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#050b2e">
+<title>ล่าสุริยุปราคา AR | วันวิทยาศาสตร์แห่งชาติ</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;font-family:'Kanit',sans-serif}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:10;padding:10px 100px 30px 14px;color:#fff;
+       background:linear-gradient(#000b,#0000);pointer-events:none}
+  #hud h2{margin:0;font-size:18px}
+  #hint{font-size:14px;opacity:.9}
+  #score{position:fixed;top:10px;right:14px;z-index:11;color:#ffd54a;font-size:20px;font-weight:600}
+  #home{position:fixed;top:42px;right:12px;z-index:11;font-family:inherit;font-size:13px;padding:4px 10px;
+        border-radius:14px;border:1px solid #fff6;background:#0006;color:#fff;display:none}
+  #view{position:fixed;bottom:16px;left:16px;z-index:10;text-align:center;color:#fff;font-size:12px;
+        text-shadow:0 1px 3px #000}
+  #view canvas{border-radius:50%;border:3px solid #fff8;display:block;margin-bottom:4px}
+  #predict{position:fixed;bottom:28px;right:16px;z-index:10;display:none}
+  .btn{font-family:inherit;font-size:18px;padding:12px 24px;border:none;border-radius:30px;
+       background:#ff9800;color:#fff;font-weight:600;box-shadow:0 4px 12px #0006}
+  .btn:disabled{opacity:.4}
+  .btn2{background:#1e88e5}
+  .menu .btn{display:block;width:100%;margin:12px 0 2px}
+  .note{font-size:13px;opacity:.75;margin:4px 0}
+  .panel{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+         background:#000d;color:#fff;text-align:center;padding:24px;box-sizing:border-box}
+  .panel>div{max-width:420px;width:100%;line-height:1.6}
+  .hidden{display:none!important}
+  #lost{position:fixed;top:45%;width:100%;text-align:center;color:#fff;z-index:9;font-size:16px;
+        text-shadow:0 2px 4px #000;pointer-events:none}
+  #feed{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}
+  body.space{background:
+    radial-gradient(1.5px 1.5px at 25px 35px,#fff,transparent),
+    radial-gradient(1px 1px at 120px 80px,#cde,transparent),
+    radial-gradient(1.5px 1.5px at 170px 150px,#fff,transparent),
+    radial-gradient(1px 1px at 60px 170px,#ffd,transparent),
+    radial-gradient(ellipse at 30% 20%,#1b2a6b,transparent 60%),#03040f;
+    background-size:200px 200px,200px 200px,200px 200px,200px 200px,100% 100%}
+
+  /* หน้าขออนุญาตกล้อง */
+  .camIcon{font-size:64px;line-height:1}
+  .steps{text-align:left;font-size:15px;background:#ffffff1a;border-radius:12px;
+         padding:12px 14px 12px 34px;margin:12px 0}
+  .steps:empty{display:none}
+  .steps li{margin:4px 0}
+  .link{background:none;border:none;color:#9fd3ff;font-family:inherit;font-size:15px;
+        text-decoration:underline;margin-top:10px}
+  .link:empty{display:none}
+  .spin{width:48px;height:48px;border:5px solid #fff3;border-top-color:#ff9800;
+        border-radius:50%;margin:0 auto 12px;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+
+<script>
+/* ---------- สร้างพื้นผิวดาวด้วย Canvas ---------- */
+function rng(seed){ return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+
+function makeTexture(type){
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512;
+  const g = c.getContext('2d'), W = c.width, H = c.height;
+
+  if (type === 'sun') {
+    const r = rng(7);
+    g.fillStyle = '#ff8c00'; g.fillRect(0,0,W,H);
+    for (let i=0;i<1500;i++){
+      g.fillStyle = `rgba(255,${180+r()*75|0},${r()*80|0},${0.15+r()*0.25})`;
+      g.beginPath(); g.arc(r()*W, r()*H, 4+r()*18, 0, 7); g.fill();
+    }
+    for (let i=0;i<6;i++){
+      g.fillStyle = 'rgba(90,30,0,0.6)';
+      g.beginPath(); g.arc(r()*W, H*0.35+r()*H*0.3, 4+r()*6, 0, 7); g.fill();
+    }
+  }
+
+  if (type === 'earth') {
+    const r = rng(42);
+    const grd = g.createLinearGradient(0,0,0,H);
+    grd.addColorStop(0,'#0b3d91'); grd.addColorStop(.5,'#1565c0'); grd.addColorStop(1,'#0b3d91');
+    g.fillStyle = grd; g.fillRect(0,0,W,H);
+    for (let k=0;k<7;k++){
+      let cx = r()*W, cy = H*0.2 + r()*H*0.6;
+      const n = 60 + r()*80 | 0;
+      for (let i=0;i<n;i++){
+        cx += (r()-0.5)*40; cy += (r()-0.5)*30;
+        cy = Math.max(H*0.12, Math.min(H*0.88, cy));
+        g.fillStyle = r() < 0.7 ? '#2e7d32' : '#8d6e3f';
+        g.beginPath(); g.arc(cx, cy, 10+r()*22, 0, 7); g.fill();
+      }
+    }
+    g.fillStyle = '#f5f9ff';
+    g.fillRect(0,0,W,H*0.07); g.fillRect(0,H*0.93,W,H*0.07);
+    for (let i=0;i<120;i++){
+      g.fillStyle = 'rgba(255,255,255,0.25)';
+      g.beginPath(); g.ellipse(r()*W, r()*H, 20+r()*50, 4+r()*8, 0, 0, 7); g.fill();
+    }
+  }
+
+  if (type === 'moon') {
+    const r = rng(3);
+    g.fillStyle = '#a5a5a5'; g.fillRect(0,0,W,H);
+    for (let i=0;i<3000;i++){
+      const v = 140 + r()*60 | 0;
+      g.fillStyle = `rgba(${v},${v},${v},0.3)`; g.fillRect(r()*W, r()*H, 3, 3);
+    }
+    for (let i=0;i<8;i++){
+      g.fillStyle = 'rgba(70,70,75,0.35)';
+      g.beginPath(); g.arc(r()*W, H*0.25+r()*H*0.5, 30+r()*70, 0, 7); g.fill();
+    }
+    for (let i=0;i<70;i++){
+      const x = r()*W, y = r()*H, s = 3 + r()*16;
+      g.fillStyle = 'rgba(0,0,0,0.25)'; g.beginPath(); g.arc(x,y,s,0,7); g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(x-1, y-1, s, Math.PI*0.8, Math.PI*1.8); g.stroke();
+    }
+  }
+  return c;
+}
+
+AFRAME.registerComponent('planet-tex', {
+  schema: { type: { default: 'earth' } },
+  init() {
+    this.tex = new THREE.CanvasTexture(makeTexture(this.data.type));
+    this.tex.colorSpace = THREE.SRGBColorSpace;
+    this.done = false;
+  },
+  tick() {
+    if (this.done) return;
+    const mesh = this.el.getObject3D('mesh');
+    if (mesh && mesh.material) {
+      mesh.material.map = this.tex; mesh.material.needsUpdate = true; this.done = true;
+    }
+  }
+});
+
+AFRAME.registerComponent('glow', {
+  schema: { size: { default: 1 } },
+  init() {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(128,128,0,128,128,128);
+    grd.addColorStop(0,'rgba(255,220,120,1)');
+    grd.addColorStop(0.35,'rgba(255,150,30,0.5)');
+    grd.addColorStop(1,'rgba(255,100,0,0)');
+    g.fillStyle = grd; g.fillRect(0,0,256,256);
+    const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c),
+      blending: THREE.AdditiveBlending, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(this.data.size, this.data.size, 1);
+    this.el.object3D.add(sprite);
+  }
+});
+</script>
+</head>
+
+<body>
+<video id="feed" class="hidden" autoplay muted playsinline></video>
+
+<!-- เมนูเริ่มเกม -->
+<div id="start" class="panel"><div class="menu">
+  <h1 style="margin:0 0 6px">ล่าสุริยุปราคา</h1>
+  <p>18 สิงหาคม พ.ศ. 2411 ณ หว้ากอ<br>ภารกิจของคุณคือจัดดวงจันทร์ให้เกิดสุริยุปราคาเต็มดวง!</p>
+  <button class="btn" id="btnFree">เล่นทันที</button>
+  <p class="note">ระบบสุริยะจะลอยอยู่หน้ากล้อง ไม่ต้องใช้โปสเตอร์</p>
+  <button class="btn btn2" id="btnMarker">ส่องโปสเตอร์ AR</button>
+  <p class="note" id="markerNote">ส่องกล้องไปที่โปสเตอร์ แล้วระบบสุริยะจะโผล่ขึ้นมาบนภาพ</p>
+  <p class="note" style="margin-top:14px">สถิติสูงสุด: <b id="best">0</b> คะแนน</p>
+</div></div>
+
+<!-- กล่องข้อความระหว่างด่าน -->
+<div id="msg" class="panel hidden"><div>
+  <h2 id="msgTitle"></h2><p id="msgBody"></p>
+  <button class="btn" id="msgBtn">ต่อไป</button>
+</div></div>
+
+<!-- หน้าขออนุญาตกล้อง / แจ้งปัญหา -->
+<div id="cam" class="panel hidden"><div>
+  <div class="camIcon">📷</div>
+  <h2 id="camTitle"></h2>
+  <p id="camBody"></p>
+  <ol id="camSteps" class="steps"></ol>
+  <button class="btn" id="camBtn"></button><br>
+  <button class="link" id="camAlt"></button><br>
+  <button class="link" id="camNoCam"></button>
+</div></div>
+
+<!-- หน้ากำลังโหลด -->
+<div id="loading" class="panel hidden"><div>
+  <div class="spin"></div><p id="loadingText">กำลังเปิดกล้อง...</p>
+</div></div>
+
+<div id="hud"><h2 id="lvName"></h2><div id="hint"></div></div>
+<div id="score">0</div>
+<button id="home">เมนู</button>
+<div id="lost" class="hidden">ส่องกล้องไปที่ภาพโปสเตอร์</div>
+<div id="view"><canvas id="sky" width="140" height="140"></canvas>มุมมองจากหว้ากอ <b id="pct">0%</b></div>
+<button class="btn" id="predict">ทำนาย!</button>
+
+<a-scene mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no"
+         renderer="colorManagement: true" vr-mode-ui="enabled: false"
+         device-orientation-permission-ui="enabled: false">
+
+  <a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false">
+    <!-- จุดยึดสำหรับโหมดเล่นทันที -->
+    <a-entity id="anchor" visible="false" rotation="-55 0 0"></a-entity>
+  </a-camera>
+  <a-entity light="type: ambient; intensity: 0.25"></a-entity>
+
+  <a-entity id="target" mindar-image-target="targetIndex: 0">
+    <a-entity id="system">
+
+      <a-cylinder radius="0.003" height="1.2" position="-0.15 0 0.25" rotation="0 0 90"
+        material="color:#fff; opacity:0.35; transparent:true; shader:flat"></a-cylinder>
+
+      <!-- ดวงอาทิตย์ -->
+      <a-entity position="-0.75 0 0.25">
+        <a-sphere radius="0.22" planet-tex="type: sun" material="shader: flat"
+          animation="property: rotation; to: 0 360 0; loop: true; dur: 30000; easing: linear"></a-sphere>
+        <a-entity glow="size: 0.9"></a-entity>
+        <a-entity light="type: point; intensity: 2.5; distance: 0; decay: 0"></a-entity>
+        <a-text value="SUN" align="center" position="0 -0.3 0" width="1" color="#ffd27a"></a-text>
+      </a-entity>
+
+      <!-- โลก -->
+      <a-entity id="earth" position="0.45 0 0.25">
+        <a-entity rotation="90 0 0">
+          <a-sphere radius="0.1" planet-tex="type: earth" material="roughness: 0.8"
+            animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
+            <a-sphere id="pin" radius="0.01" position="0.098 0.021 0"
+              material="color:#ff3b3b; emissive:#ff0000; emissiveIntensity:0.6"></a-sphere>
+          </a-sphere>
+        </a-entity>
+        <a-ring id="orbit" radius-inner="0.297" radius-outer="0.303"
+          material="color:#9ad; opacity:0.5; transparent:true; side:double; shader:flat"></a-ring>
+        <a-text value="EARTH" align="center" position="0 -0.17 0" width="1" color="#9fd3ff"></a-text>
+      </a-entity>
+
+      <!-- ดวงจันทร์ + เงา -->
+      <a-entity id="moon">
+        <a-sphere radius="0.035" planet-tex="type: moon" material="roughness: 1"></a-sphere>
+        <a-cone id="umbra" radius-bottom="0.035" radius-top="0.006" height="0.165"
+          position="0.1175 0 0" rotation="0 0 -90"
+          material="color:#000; opacity:0; transparent:true; shader:flat"></a-cone>
+        <a-cone id="penumbra" radius-bottom="0.035" radius-top="0.06" height="0.165"
+          position="0.1175 0 0" rotation="0 0 -90"
+          material="color:#000; opacity:0; transparent:true; shader:flat; depthWrite:false"></a-cone>
+        <a-text value="MOON" align="center" position="0 -0.06 0" width="0.6" color="#ddd"></a-text>
+      </a-entity>
+
+    </a-entity>
+  </a-entity>
+</a-scene>
+
+<script>
+const $ = id => document.getElementById(id);
+const EARTH = { x: 0.45, y: 0, z: 0.25 }, R_ORBIT = 0.3;
+
+const LEVELS = [
+  { name: 'ด่าน 1: เรียงให้ตรง',
+    hint: 'ลากนิ้วซ้าย-ขวา หมุนดวงจันทร์ให้อยู่ระหว่างดวงอาทิตย์กับโลก แล้วค้างไว้',
+    tilt: false, auto: false, h0: 0,
+    doneTitle: 'เกิดสุริยุปราคาเต็มดวง!',
+    fact: 'สุริยุปราคาเกิดเมื่อดวงจันทร์อยู่ระหว่างดวงอาทิตย์กับโลกในแนวเส้นตรง บริเวณที่เงามืด (umbra) ตกลงบนโลกจะเห็นแบบเต็มดวง ส่วนบริเวณที่อยู่ในเงามัว (penumbra) จะเห็นเพียงบางส่วน' },
+  { name: 'ด่าน 2: วงโคจรเอียง',
+    hint: 'ลากซ้าย-ขวาเพื่อหมุน และลากขึ้น-ลงเพื่อปรับความสูงของดวงจันทร์',
+    tilt: true, auto: false, h0: 0.06,
+    doneTitle: 'เก่งมาก!',
+    fact: 'วงโคจรของดวงจันทร์เอียงจากระนาบวงโคจรของโลกราว 5° ส่วนใหญ่ดวงจันทร์จึงผ่านเหนือหรือใต้แนวดวงอาทิตย์ไป สุริยุปราคาเลยไม่ได้เกิดทุกเดือน' },
+  { name: 'ด่าน 3: พยากรณ์แบบหว้ากอ',
+    hint: 'ดวงจันทร์เคลื่อนที่เอง! กด "ทำนาย!" ตอนที่คิดว่าจะเกิดเต็มดวง (กดได้ 3 ครั้ง)',
+    tilt: false, auto: true,
+    doneTitle: 'นักพยากรณ์ดาราศาสตร์!',
+    fact: 'วันที่ 18 สิงหาคม พ.ศ. 2411 พระบาทสมเด็จพระจอมเกล้าเจ้าอยู่หัว รัชกาลที่ 4 ทรงคำนวณการเกิดสุริยุปราคาเต็มดวงที่ตำบลหว้ากอ จังหวัดประจวบคีรีขันธ์ ได้อย่างแม่นยำ วันที่ 18 สิงหาคมจึงได้รับการกำหนดให้เป็นวันวิทยาศาสตร์แห่งชาติ' }
+];
+
+const S = { mode: 'free', level: 0, theta: 60, h: 0, score: 0, state: 'start', found: false,
+            hold: 0, t: 0, start: 110, speed: 25, tStar: 3, k: 0.015, tries: 0, best: 0 };
+
+/* ---------- คำนวณว่าดวงอาทิตย์ถูกบังกี่ % ---------- */
+function overlap(d, r1, r2) {
+  if (d >= r1 + r2) return 0;
+  if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
+  const a = r1*r1 * Math.acos((d*d + r1*r1 - r2*r2) / (2*d*r1));
+  const b = r2*r2 * Math.acos((d*d + r2*r2 - r1*r1) / (2*d*r2));
+  const c = 0.5 * Math.sqrt((-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2));
+  return a + b - c;
+}
+function coverage() {
+  const dTheta = ((S.theta - 180) % 360 + 540) % 360 - 180;
+  const dx = dTheta * 0.04, dy = S.h * 25;
+  const cov = overlap(Math.hypot(dx, dy), 1, 1.15) / Math.PI;
+  return { cov: Math.min(1, cov), dx, dy };
+}
+
+/* ---------- หน้าต่าง "มุมมองจากหว้ากอ" ---------- */
+const sky = $('sky').getContext('2d');
+function drawSky(cov, dx, dy) {
+  const W = 140, c = 70, R = 28;
+  const b = Math.round(150 * (1 - cov));
+  const skyCol = `rgb(${b*0.5|0},${b*0.8|0},${b+20})`;
+  sky.fillStyle = skyCol; sky.fillRect(0, 0, W, W);
+  if (cov > 0.97) {
+    const g = sky.createRadialGradient(c, c, R, c, c, R * 2.4);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    sky.fillStyle = g; sky.fillRect(0, 0, W, W);
+  }
+  sky.fillStyle = '#ffd54a'; sky.beginPath(); sky.arc(c, c, R, 0, 7); sky.fill();
+  sky.fillStyle = cov > 0.97 ? '#05050f' : skyCol;
+  sky.beginPath(); sky.arc(c + dx * R, c - dy * R, R * 1.15, 0, 7); sky.fill();
+}
+
+/* ---------- อัปเดตฉาก 3D ---------- */
+function updateScene(cov) {
+  const a = S.theta * Math.PI / 180;
+  $('moon').object3D.position.set(
+    EARTH.x + R_ORBIT * Math.cos(a), EARTH.y + R_ORBIT * Math.sin(a), EARTH.z + S.h);
+  $('orbit').object3D.position.z = S.h;
+  const um = $('umbra').getObject3D('mesh'), pm = $('penumbra').getObject3D('mesh');
+  const k = cov > 0.3 ? (cov - 0.3) / 0.7 : 0;
+  if (um) um.material.opacity = 0.8 * k;
+  if (pm) pm.material.opacity = 0.25 * k;
+  $('pin').object3D.scale.setScalar(cov > 0.97 ? 1.8 : 1);
+}
+
+/* ---------- การควบคุมด้วยการลากนิ้ว ---------- */
+let drag = null;
+window.addEventListener('pointerdown', e => {
+  if (e.target.closest('button')) return;
+  drag = { x: e.clientX, y: e.clientY };
+});
+window.addEventListener('pointermove', e => {
+  if (!drag || S.state !== 'play' || !S.found) return;
+  const L = LEVELS[S.level]; if (L.auto) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  drag = { x: e.clientX, y: e.clientY };
+  S.theta += dx * 0.25;
+  if (L.tilt) S.h = Math.max(-0.08, Math.min(0.08, S.h - dy * 0.0006));
+});
+window.addEventListener('pointerup', () => drag = null);
+
+/* ---------- เสียง / จอไม่ดับ / สถิติ ---------- */
+let actx = null;
+function unlockAudio() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {}
+}
+function chime() {
+  if (!actx) return;
+  const t0 = actx.currentTime;
+  [523, 659, 784, 1047].forEach((f, i) => {
+    const o = actx.createOscillator(), v = actx.createGain(), t = t0 + i * 0.12;
+    o.frequency.value = f;
+    v.gain.setValueAtTime(0.0001, t);
+    v.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+    v.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+    o.connect(v); v.connect(actx.destination); o.start(t); o.stop(t + 0.65);
+  });
+}
+async function keepAwake() { try { await navigator.wakeLock.request('screen'); } catch {} }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.state !== 'start') keepAwake();
+});
+const BEST_KEY = 'eclipse-ar-best';
+function getBest() { try { return +(localStorage.getItem(BEST_KEY) || 0); } catch { return 0; } }
+function setBest(v) { try { localStorage.setItem(BEST_KEY, v); } catch {} }
+$('best').textContent = getBest();
+
+/* ---------- ลำดับเกม ---------- */
+function showMsg(title, body, btn, cb) {
+  $('msgTitle').textContent = title; $('msgBody').innerHTML = body;
+  $('msgBtn').textContent = btn; $('msg').classList.remove('hidden');
+  $('msgBtn').onclick = () => { $('msg').classList.add('hidden'); cb(); };
+}
+function startAuto() {
+  S.t = 0; S.start = 110; S.speed = 18 + Math.random() * 14;
+  S.tStar = (180 - S.start) / S.speed; S.k = 0.05 / S.tStar;
+}
+function startLevel() {
+  const L = LEVELS[S.level];
+  S.theta = 60; S.h = L.h0 || 0; S.hold = 0; S.state = 'play';
+  $('lvName').textContent = L.name; $('hint').textContent = L.hint;
+  $('predict').style.display = L.auto ? 'block' : 'none';
+  if (L.auto) { S.tries = 0; S.best = 0; startAuto(); }
+}
+function enterGame() {
+  $('home').style.display = 'block';
+  keepAwake();
+  startLevel();
+}
+function win(pts) {
+  S.state = 'msg'; S.score += pts; $('score').textContent = S.score;
+  chime();
+  const L = LEVELS[S.level], last = S.level === LEVELS.length - 1;
+  showMsg(L.doneTitle, `+${pts} คะแนน<br><br>${L.fact}`, last ? 'ดูสรุป' : 'ด่านต่อไป', () => {
+    if (!last) { S.level++; startLevel(); } else finish();
+  });
+}
+function finish() {
+  $('predict').style.display = 'none';
+  const best = Math.max(getBest(), S.score); setBest(best); $('best').textContent = best;
+  showMsg('ภารกิจสำเร็จ!',
+    `คะแนนรวม <b>${S.score}</b> / 300<br>สถิติสูงสุดในเครื่องนี้ ${best}<br><br>
+     <b>ข้อควรระวัง:</b> ห้ามมองดวงอาทิตย์ด้วยตาเปล่าหรือผ่านกล้องโดยตรง
+     ให้ใช้แว่นกรองแสงสำหรับดูดวงอาทิตย์โดยเฉพาะเท่านั้น`,
+    'เล่นอีกครั้ง', () => { S.level = 0; S.score = 0; $('score').textContent = 0; startLevel(); });
+}
+$('predict').onclick = () => {
+  if (S.state !== 'play') return;
+  const pts = Math.round(coverage().cov * 100);
+  S.tries++; S.best = Math.max(S.best, pts);
+  $('hint').textContent = `ครั้งที่ ${S.tries}: บังได้ ${pts}%` +
+    (pts >= 97 ? ' แม่นยำระดับหว้ากอ!' : ' ลองอีกครั้ง');
+  if (S.tries >= 3 || pts >= 97) win(S.best); else startAuto();
+};
+$('home').onclick = () => location.reload();
+
+/* =====================================================
+   ระบบกล้องและโหมดการเล่น
+   ===================================================== */
+const UA = navigator.userAgent;
+const ENV = {
+  ios: /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+  android: /Android/i.test(UA),
+  line: /Line\//i.test(UA),
+  inApp: /Line\/|FBAN|FBAV|Instagram|TikTok|musical_ly|Messenger/i.test(UA)
+};
+
+function showLoading(text) { $('loadingText').textContent = text; $('loading').classList.remove('hidden'); }
+function hideLoading() { $('loading').classList.add('hidden'); }
+
+function camPanel({ title, body, steps = [], btn, onBtn, alt = '', onAlt = null, noCam = false }) {
+  $('camTitle').textContent = title;
+  $('camBody').innerHTML = body;
+  $('camSteps').innerHTML = steps.map(s => `<li>${s}</li>`).join('');
+  $('camBtn').textContent = btn;
+  $('camBtn').onclick = onBtn;
+  $('camAlt').textContent = alt;
+  $('camAlt').onclick = onAlt;
+  $('camNoCam').textContent = noCam ? 'เล่นแบบไม่ใช้กล้อง (พื้นหลังอวกาศ)' : '';
+  $('camNoCam').onclick = () => startFree(null);
+  $('cam').classList.remove('hidden');
+}
+
+function settingSteps() {
+  if (ENV.ios) return [
+    'แตะไอคอน <b>aA</b> ที่แถบที่อยู่เว็บ (ใน Safari)',
+    'เลือก <b>การตั้งค่าเว็บไซต์</b> (Website Settings)',
+    'ตั้ง <b>กล้อง</b> เป็น <b>อนุญาต</b>',
+    'ถ้าใช้ Chrome บน iPhone: ไปที่ <b>การตั้งค่า → Chrome → เปิดกล้อง</b>',
+    'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
+  ];
+  if (ENV.android) return [
+    'แตะไอคอน <b>แม่กุญแจ</b> หรือ <b>ปรับแต่ง</b> ด้านซ้ายของแถบที่อยู่เว็บ',
+    'เลือก <b>สิทธิ์</b> (Permissions) แล้วเลือก <b>กล้อง</b>',
+    'เลือก <b>อนุญาต</b>',
+    'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
+  ];
+  return [
+    'คลิกไอคอน <b>กล้อง</b> หรือ <b>แม่กุญแจ</b> ในแถบที่อยู่เว็บ',
+    'เลือก <b>อนุญาต</b> ให้ใช้กล้อง',
+    'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
+  ];
+}
+
+async function permState() {
+  try { return (await navigator.permissions.query({ name: 'camera' })).state; }
+  catch { return 'unknown'; }
+}
+
+/* ขอกล้อง แล้วเข้าโหมดที่เลือก */
+async function tryCamera() {
+  $('cam').classList.add('hidden');
+  showLoading('กำลังขอสิทธิ์ใช้กล้อง...');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } }, audio: false
+    });
+    hideLoading();
+    if (S.mode === 'marker') { stream.getTracks().forEach(t => t.stop()); startAR(); }
+    else startFree(stream);
+  } catch (e) {
+    console.warn('Camera error:', e);
+    hideLoading();
+    handleCamError(e.name || 'Unknown');
+  }
+}
+
+function switchToFree() {
+  try { document.querySelector('a-scene').systems['mindar-image-system'].stop(); } catch {}
+  S.mode = 'free';
+  tryCamera();
+}
+
+function handleCamError(code) {
+  const reload = () => location.reload();
+  switch (code) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+    case 'SecurityError':
+      return camPanel({
+        title: 'ยังไม่ได้รับอนุญาตให้ใช้กล้อง',
+        body: 'เปิดสิทธิ์กล้องได้ตามขั้นตอนนี้',
+        steps: settingSteps(),
+        btn: 'โหลดหน้าใหม่', onBtn: reload,
+        alt: 'ลองขอสิทธิ์อีกครั้ง', onAlt: tryCamera, noCam: true
+      });
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+    case 'OverconstrainedError':
+      return camPanel({
+        title: 'ไม่พบกล้อง',
+        body: 'อุปกรณ์นี้อาจไม่มีกล้อง หรือกล้องถูกปิดไว้',
+        btn: 'ลองอีกครั้ง', onBtn: tryCamera, noCam: true
+      });
+    case 'NotReadableError':
+    case 'TrackStartError':
+    case 'AbortError':
+      return camPanel({
+        title: 'กล้องถูกใช้งานอยู่',
+        body: 'ปิดแอปอื่นที่ใช้กล้องอยู่ก่อน เช่น แอปกล้อง วิดีโอคอล หรือ Zoom แล้วลองใหม่',
+        btn: 'ลองอีกครั้ง', onBtn: tryCamera, noCam: true
+      });
+    case 'insecure':
+      return camPanel({
+        title: 'ต้องเปิดผ่านลิงก์ที่ปลอดภัย',
+        body: 'เบราว์เซอร์อนุญาตให้ใช้กล้องเฉพาะเว็บที่ขึ้นต้นด้วย <b>https://</b>',
+        btn: 'เปิดลิงก์ HTTPS',
+        onBtn: () => location.href = location.href.replace(/^http:/, 'https:'), noCam: true
+      });
+    case 'unsupported':
+      return camPanel({
+        title: 'เบราว์เซอร์นี้ไม่รองรับกล้อง',
+        body: 'กรุณาเปิดด้วย <b>Chrome</b> (Android) หรือ <b>Safari</b> (iPhone/iPad) เวอร์ชันล่าสุด',
+        btn: 'ลองอีกครั้ง', onBtn: reload, noCam: true
+      });
+    case 'arError':
+      return camPanel({
+        title: 'เปิดโหมดโปสเตอร์ไม่สำเร็จ',
+        body: 'อาจยังไม่มีไฟล์ targets.mind หรืออินเทอร์เน็ตช้า<br>เล่นโหมดไม่ใช้โปสเตอร์แทนได้เลย',
+        btn: 'เล่นแบบไม่ใช้โปสเตอร์', onBtn: switchToFree,
+        alt: 'โหลดหน้าใหม่', onAlt: reload
+      });
+    default:
+      return camPanel({
+        title: 'เปิดกล้องไม่สำเร็จ',
+        body: `เกิดข้อผิดพลาด (${code})<br>ลองโหลดหน้าใหม่ หรือเปลี่ยนไปใช้เบราว์เซอร์อื่น`,
+        btn: 'โหลดหน้าใหม่', onBtn: reload, noCam: true
+      });
+  }
+}
+
+function showInApp() {
+  const url = new URL(location.href);
+  url.searchParams.set('openExternalBrowser', '1');
+  camPanel({
+    title: 'กรุณาเปิดในเบราว์เซอร์',
+    body: 'แอปที่คุณใช้เปิดลิงก์อยู่ (เช่น LINE หรือ Facebook) มักไม่อนุญาตให้เว็บใช้กล้อง',
+    steps: ENV.line
+      ? ['กดปุ่มด้านล่าง ระบบจะเปิดเกมใน Safari หรือ Chrome ให้อัตโนมัติ']
+      : ['แตะปุ่ม <b>⋯</b> ที่มุมขวาบน', 'เลือก <b>เปิดในเบราว์เซอร์</b> (Open in browser)'],
+    btn: ENV.line ? 'เปิดในเบราว์เซอร์' : 'คัดลอกลิงก์',
+    onBtn: ENV.line
+      ? () => location.href = url.toString()
+      : async () => {
+          try { await navigator.clipboard.writeText(location.href); $('camBtn').textContent = 'คัดลอกแล้ว ✓'; }
+          catch { prompt('คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์', location.href); }
+        },
+    alt: 'ลองเล่นในแอปนี้ต่อ', onAlt: () => beginCameraFlow(true), noCam: true
+  });
+}
+
+/* ---------- โหมดเล่นทันที: ระบบสุริยะลอยหน้ากล้อง ---------- */
+function fitAnchor() {
+  const aspect = innerWidth / innerHeight;
+  const d = Math.max(1.6, 0.95 / (Math.tan(40 * Math.PI / 180) * aspect));
+  $('anchor').object3D.position.set(0.09, -0.12, -d);
+}
+addEventListener('resize', () => { if (S.mode === 'free') fitAnchor(); });
+
+async function startFree(stream) {
+  S.mode = 'free';
+  ['start', 'cam'].forEach(id => $(id).classList.add('hidden'));
+  if (stream) {
+    const v = $('feed'); v.srcObject = stream; v.classList.remove('hidden');
+    try { await v.play(); } catch {}
+  } else {
+    document.body.classList.add('space');
+  }
+  $('anchor').object3D.add($('system').object3D);   // ย้ายโมเดลมาไว้หน้ากล้อง
+  $('anchor').setAttribute('visible', true);
+  fitAnchor();
+  S.found = true;
+  enterGame();
+}
+
+/* ---------- โหมดโปสเตอร์ (MindAR) ---------- */
+function startAR() {
+  S.mode = 'marker';
+  showLoading('กำลังเปิดกล้องและโหลด AR...');
+  const sc = document.querySelector('a-scene');
+  let done = false;
+  const fail = () => { if (done) return; done = true; hideLoading(); handleCamError('arError'); };
+  const timer = setTimeout(fail, 25000);
+
+  sc.addEventListener('arReady', () => {
+    if (done) return; done = true; clearTimeout(timer);
+    hideLoading(); $('lost').classList.remove('hidden'); enterGame();
+  }, { once: true });
+  sc.addEventListener('arError', () => { clearTimeout(timer); fail(); }, { once: true });
+
+  const go = () => sc.systems['mindar-image-system'].start();
+  sc.hasLoaded ? go() : sc.addEventListener('loaded', go, { once: true });
+}
+
+/* ---------- ขั้นตอนหลังเลือกโหมด ---------- */
+async function beginCameraFlow(skipInAppCheck = false) {
+  $('start').classList.add('hidden');
+  $('cam').classList.add('hidden');
+
+  if (ENV.inApp && !skipInAppCheck) return showInApp();
+  if (!window.isSecureContext) return handleCamError('insecure');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return handleCamError('unsupported');
+
+  const st = await permState();
+  if (st === 'granted') return tryCamera();
+  if (st === 'denied')  return handleCamError('NotAllowedError');
+
+  camPanel({
+    title: 'ขออนุญาตใช้กล้อง',
+    body: (S.mode === 'marker'
+            ? 'เกมใช้กล้องเพื่อส่องโปสเตอร์และแสดงระบบสุริยะ 3D'
+            : 'เกมใช้กล้องเป็นฉากหลัง ให้ระบบสุริยะลอยอยู่ตรงหน้าคุณ') +
+          '<br><small>ภาพจากกล้องใช้บนเครื่องของคุณเท่านั้น ไม่มีการบันทึกหรือส่งออกไปไหน</small>',
+    steps: ['กดปุ่มด้านล่าง', 'เมื่อมีหน้าต่างถาม ให้กด <b>อนุญาต</b> (Allow)'],
+    btn: 'อนุญาตใช้กล้อง', onBtn: tryCamera, noCam: true
+  });
+}
+
+$('btnFree').onclick   = () => { unlockAudio(); S.mode = 'free';   beginCameraFlow(); };
+$('btnMarker').onclick = () => { unlockAudio(); S.mode = 'marker'; beginCameraFlow(); };
+
+/* ตรวจว่ามีไฟล์ targets.mind หรือยัง */
+fetch('targets.mind', { method: 'HEAD', cache: 'no-store' })
+  .then(r => { if (!r.ok) throw new Error(r.status); })
+  .catch(() => {
+    $('btnMarker').disabled = true;
+    $('markerNote').textContent = 'ยังใช้โหมดนี้ไม่ได้ เพราะยังไม่มีไฟล์ targets.mind (สร้างได้จากหน้า poster.html)';
+  });
+
+/* ---------- ตรวจจับ Marker ---------- */
+$('target').addEventListener('targetFound', () => { S.found = true;  $('lost').classList.add('hidden'); });
+$('target').addEventListener('targetLost',  () => {
+  if (S.mode !== 'marker') return;
+  S.found = false; if (S.state === 'play') $('lost').classList.remove('hidden');
+});
+
+/* ---------- Game loop ---------- */
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const L = LEVELS[S.level];
+  if (S.state === 'play' && S.found && L.auto) {
+    S.t += dt;
+    S.theta = S.start + S.speed * S.t;
+    S.h = S.k * (S.tStar - S.t);
+    if (S.theta > 270) startAuto();
+  }
+  const { cov, dx, dy } = coverage();
+  updateScene(cov); drawSky(cov, dx, dy);
+  $('pct').textContent = Math.round(cov * 100) + '%';
+  if (S.state === 'play' && S.found && !L.auto) {
+    if (cov >= 0.97) { S.hold += dt; if (S.hold > 1.0) win(100); } else S.hold = 0;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
