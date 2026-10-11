@@ -3,37 +3,46 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<meta name="theme-color" content="#050b2e">
+<meta name="theme-color" content="#03061f">
 <title>ล่าสุริยุปราคา AR | วันวิทยาศาสตร์แห่งชาติ</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;600&display=swap" rel="stylesheet">
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;font-family:'Kanit',sans-serif}
-  #hud{position:fixed;top:0;left:0;right:0;z-index:10;padding:10px 100px 30px 14px;color:#fff;
-       background:linear-gradient(#000b,#0000);pointer-events:none}
-  #hud h2{margin:0;font-size:18px}
-  #hint{font-size:14px;opacity:.9}
-  #score{position:fixed;top:10px;right:14px;z-index:11;color:#ffd54a;font-size:20px;font-weight:600}
-  #home{position:fixed;top:42px;right:12px;z-index:11;font-family:inherit;font-size:13px;padding:4px 10px;
-        border-radius:14px;border:1px solid #fff6;background:#0006;color:#fff;display:none}
-  #view{position:fixed;bottom:16px;left:16px;z-index:10;text-align:center;color:#fff;font-size:12px;
-        text-shadow:0 1px 3px #000}
-  #view canvas{border-radius:50%;border:3px solid #fff8;display:block;margin-bottom:4px}
-  #predict{position:fixed;bottom:28px;right:16px;z-index:10;display:none}
-  .btn{font-family:inherit;font-size:18px;padding:12px 24px;border:none;border-radius:30px;
-       background:#ff9800;color:#fff;font-weight:600;box-shadow:0 4px 12px #0006}
-  .btn:disabled{opacity:.4}
-  .btn2{background:#1e88e5}
-  .menu .btn{display:block;width:100%;margin:12px 0 2px}
-  .note{font-size:13px;opacity:.75;margin:4px 0}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;font-family:'Kanit',sans-serif;background:#03061f;color:#fff}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:10;padding:12px 100px 30px 16px;
+       background:linear-gradient(rgba(3,6,31,0.9),transparent);pointer-events:none}
+  #hud h2{margin:0;font-size:19px;text-shadow:0 2px 4px rgba(0,0,0,0.5)}
+  #hint{font-size:14px;opacity:0.9;margin-top:2px}
+  #score{position:fixed;top:12px;right:16px;z-index:11;color:#ffd54a;font-size:22px;font-weight:600;
+         text-shadow:0 2px 4px rgba(0,0,0,0.5)}
+  #home{position:fixed;top:46px;right:16px;z-index:11;font-family:inherit;font-size:13px;padding:5px 12px;
+        border-radius:16px;border:1px solid rgba(255,255,255,0.3);background:rgba(0,0,0,0.5);color:#fff;display:none;cursor:pointer}
+  #view{position:fixed;bottom:20px;left:20px;z-index:10;text-align:center;font-size:12px;
+        text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+  #view canvas{border-radius:50%;border:3px solid rgba(255,255,255,0.8);display:block;margin-bottom:6px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+  #predict{position:fixed;bottom:28px;right:20px;z-index:10;display:none}
+  
+  .btn{font-family:inherit;font-size:18px;padding:14px 28px;border:none;border-radius:30px;
+       background:linear-gradient(135deg, #ff9800, #f57c00);color:#fff;font-weight:600;
+       box-shadow:0 6px 20px rgba(255,152,0,0.4);cursor:pointer;transition:transform 0.1s}
+  .btn:active{transform:scale(0.96)}
+  .btn:disabled{opacity:0.4;cursor:default;box-shadow:none}
+  .btn2{background:linear-gradient(135deg, #1e88e5, #1565c0);box-shadow:0 6px 20px rgba(30,136,229,0.4)}
+  
+  .menu .btn{display:block;width:100%;margin:14px 0 4px}
+  .note{font-size:13px;opacity:0.75;margin:4px 0 12px}
+  
   .panel{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
-         background:#000d;color:#fff;text-align:center;padding:24px;box-sizing:border-box}
-  .panel>div{max-width:420px;width:100%;line-height:1.6}
+         background:rgba(3,6,31,0.85);backdrop-filter:blur(8px);padding:24px;box-sizing:border-box}
+  .panel>div{max-width:420px;width:100%;line-height:1.6;text-align:center;background:rgba(255,255,255,0.05);
+             border:1px solid rgba(255,255,255,0.1);padding:30px 24px;border-radius:24px;box-shadow:0 20px 40px rgba(0,0,0,0.6)}
   .hidden{display:none!important}
+  
   #lost{position:fixed;top:45%;width:100%;text-align:center;color:#fff;z-index:9;font-size:16px;
-        text-shadow:0 2px 4px #000;pointer-events:none}
+        text-shadow:0 2px 6px rgba(0,0,0,0.9);pointer-events:none;background:rgba(0,0,0,0.4);padding:8px}
   #feed{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1}
+  
   body.space{background:
     radial-gradient(1.5px 1.5px at 25px 35px,#fff,transparent),
     radial-gradient(1px 1px at 120px 80px,#cde,transparent),
@@ -42,17 +51,15 @@
     radial-gradient(ellipse at 30% 20%,#1b2a6b,transparent 60%),#03040f;
     background-size:200px 200px,200px 200px,200px 200px,200px 200px,100% 100%}
 
-  /* หน้าขออนุญาตกล้อง */
-  .camIcon{font-size:64px;line-height:1}
-  .steps{text-align:left;font-size:15px;background:#ffffff1a;border-radius:12px;
-         padding:12px 14px 12px 34px;margin:12px 0}
-  .steps:empty{display:none}
-  .steps li{margin:4px 0}
+  .camIcon{font-size:56px;line-height:1;margin-bottom:10px}
+  .steps{text-align:left;font-size:14px;background:rgba(0,0,0,0.3);border-radius:12px;
+         padding:12px 14px 12px 32px;margin:14px 0}
+  .steps li{margin:6px 0}
   .link{background:none;border:none;color:#9fd3ff;font-family:inherit;font-size:15px;
-        text-decoration:underline;margin-top:10px}
+        text-decoration:underline;margin-top:12px;cursor:pointer}
   .link:empty{display:none}
-  .spin{width:48px;height:48px;border:5px solid #fff3;border-top-color:#ff9800;
-        border-radius:50%;margin:0 auto 12px;animation:sp 1s linear infinite}
+  .spin{width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#ff9800;
+        border-radius:50%;margin:0 auto 16px;animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 
@@ -160,59 +167,58 @@ AFRAME.registerComponent('glow', {
 <body>
 <video id="feed" class="hidden" autoplay muted playsinline></video>
 
-<!-- เมนูเริ่มเกม -->
+<!-- หน้าหลัก -->
 <div id="start" class="panel"><div class="menu">
-  <h1 style="margin:0 0 6px">ล่าสุริยุปราคา</h1>
-  <p>18 สิงหาคม พ.ศ. 2411 ณ หว้ากอ<br>ภารกิจของคุณคือจัดดวงจันทร์ให้เกิดสุริยุปราคาเต็มดวง!</p>
-  <button class="btn" id="btnFree">เล่นทันที</button>
-  <p class="note">ระบบสุริยะจะลอยอยู่หน้ากล้อง ไม่ต้องใช้โปสเตอร์</p>
+  <h1 style="margin:0 0 8px;font-size:26px">ล่าสุริยุปราคา</h1>
+  <p style="margin-bottom:20px;opacity:0.9">18 สิงหาคม พ.ศ. 2411 ณ หว้ากอ<br>ภารกิจของคุณคือจัดดวงจันทร์ให้เกิดสุริยุปราคาเต็มดวง!</p>
+  <button class="btn" id="btnFree">เล่นทันที (ไม่ต้องใช้โปสเตอร์)</button>
+  <p class="note">ระบบสุริยะจะลอยอยู่ตรงหน้าจอ เล่นได้ทันทีทุกที่</p>
   <button class="btn btn2" id="btnMarker">ส่องโปสเตอร์ AR</button>
-  <p class="note" id="markerNote">ส่องกล้องไปที่โปสเตอร์ แล้วระบบสุริยะจะโผล่ขึ้นมาบนภาพ</p>
-  <p class="note" style="margin-top:14px">สถิติสูงสุด: <b id="best">0</b> คะแนน</p>
+  <p class="note" id="markerNote">ส่องกล้องไปที่ภาพโปสเตอร์ Marker เพื่อแสดงผลแบบ AR</p>
+  <p class="note" style="margin-top:10px">สถิติสูงสุด: <b id="best" style="color:#ffd54a">0</b> คะแนน</p>
 </div></div>
 
 <!-- กล่องข้อความระหว่างด่าน -->
 <div id="msg" class="panel hidden"><div>
-  <h2 id="msgTitle"></h2><p id="msgBody"></p>
+  <h2 id="msgTitle" style="color:#ffd54a;margin-top:0"></h2>
+  <p id="msgBody" style="margin:16px 0"></p>
   <button class="btn" id="msgBtn">ต่อไป</button>
 </div></div>
 
 <!-- หน้าขออนุญาตกล้อง / แจ้งปัญหา -->
 <div id="cam" class="panel hidden"><div>
   <div class="camIcon">📷</div>
-  <h2 id="camTitle"></h2>
-  <p id="camBody"></p>
+  <h2 id="camTitle" style="margin-top:0"></h2>
+  <p id="msgBody2" id-ref="camBody"></p>
+  <div id="camBody" style="font-size:14px;margin:8px 0"></div>
   <ol id="camSteps" class="steps"></ol>
   <button class="btn" id="camBtn"></button><br>
   <button class="link" id="camAlt"></button><br>
-  <button class="link" id="camNoCam"></button>
+  <button class="link" id="camNoCam" style="color:#ffb74d"></button>
 </div></div>
 
-<!-- หน้ากำลังโหลด -->
+<!-- หน้าโหลด -->
 <div id="loading" class="panel hidden"><div>
-  <div class="spin"></div><p id="loadingText">กำลังเปิดกล้อง...</p>
+  <div class="spin"></div><p id="loadingText" style="margin:0">กำลังเปิดกล้อง...</p>
 </div></div>
 
 <div id="hud"><h2 id="lvName"></h2><div id="hint"></div></div>
 <div id="score">0</div>
-<button id="home">เมนู</button>
-<div id="lost" class="hidden">ส่องกล้องไปที่ภาพโปสเตอร์</div>
-<div id="view"><canvas id="sky" width="140" height="140"></canvas>มุมมองจากหว้ากอ <b id="pct">0%</b></div>
+<button id="home">เมนูหลัก</button>
+<div id="lost" class="hidden">กรุณาส่องกล้องไปที่ภาพโปสเตอร์ Marker</div>
+<div id="view"><canvas id="sky" width="140" height="140"></canvas>มุมมองจากหว้ากอ<br><b id="pct" style="color:#ffd54a">0%</b></div>
 <button class="btn" id="predict">ทำนาย!</button>
 
 <a-scene mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiScanning: no; uiLoading: no; uiError: no"
          renderer="colorManagement: true" vr-mode-ui="enabled: false"
          device-orientation-permission-ui="enabled: false">
-
   <a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false">
-    <!-- จุดยึดสำหรับโหมดเล่นทันที -->
     <a-entity id="anchor" visible="false" rotation="-55 0 0"></a-entity>
   </a-camera>
   <a-entity light="type: ambient; intensity: 0.25"></a-entity>
 
   <a-entity id="target" mindar-image-target="targetIndex: 0">
     <a-entity id="system">
-
       <a-cylinder radius="0.003" height="1.2" position="-0.15 0 0.25" rotation="0 0 90"
         material="color:#fff; opacity:0.35; transparent:true; shader:flat"></a-cylinder>
 
@@ -250,7 +256,6 @@ AFRAME.registerComponent('glow', {
           material="color:#000; opacity:0; transparent:true; shader:flat; depthWrite:false"></a-cone>
         <a-text value="MOON" align="center" position="0 -0.06 0" width="0.6" color="#ddd"></a-text>
       </a-entity>
-
     </a-entity>
   </a-entity>
 </a-scene>
@@ -280,7 +285,6 @@ const LEVELS = [
 const S = { mode: 'free', level: 0, theta: 60, h: 0, score: 0, state: 'start', found: false,
             hold: 0, t: 0, start: 110, speed: 25, tStar: 3, k: 0.015, tries: 0, best: 0 };
 
-/* ---------- คำนวณว่าดวงอาทิตย์ถูกบังกี่ % ---------- */
 function overlap(d, r1, r2) {
   if (d >= r1 + r2) return 0;
   if (d <= Math.abs(r1 - r2)) return Math.PI * Math.min(r1, r2) ** 2;
@@ -296,7 +300,6 @@ function coverage() {
   return { cov: Math.min(1, cov), dx, dy };
 }
 
-/* ---------- หน้าต่าง "มุมมองจากหว้ากอ" ---------- */
 const sky = $('sky').getContext('2d');
 function drawSky(cov, dx, dy) {
   const W = 140, c = 70, R = 28;
@@ -313,7 +316,6 @@ function drawSky(cov, dx, dy) {
   sky.beginPath(); sky.arc(c + dx * R, c - dy * R, R * 1.15, 0, 7); sky.fill();
 }
 
-/* ---------- อัปเดตฉาก 3D ---------- */
 function updateScene(cov) {
   const a = S.theta * Math.PI / 180;
   $('moon').object3D.position.set(
@@ -326,7 +328,6 @@ function updateScene(cov) {
   $('pin').object3D.scale.setScalar(cov > 0.97 ? 1.8 : 1);
 }
 
-/* ---------- การควบคุมด้วยการลากนิ้ว ---------- */
 let drag = null;
 window.addEventListener('pointerdown', e => {
   if (e.target.closest('button')) return;
@@ -342,7 +343,6 @@ window.addEventListener('pointermove', e => {
 });
 window.addEventListener('pointerup', () => drag = null);
 
-/* ---------- เสียง / จอไม่ดับ / สถิติ ---------- */
 let actx = null;
 function unlockAudio() {
   try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); actx.resume(); } catch {}
@@ -368,7 +368,6 @@ function getBest() { try { return +(localStorage.getItem(BEST_KEY) || 0); } catc
 function setBest(v) { try { localStorage.setItem(BEST_KEY, v); } catch {} }
 $('best').textContent = getBest();
 
-/* ---------- ลำดับเกม ---------- */
 function showMsg(title, body, btn, cb) {
   $('msgTitle').textContent = title; $('msgBody').innerHTML = body;
   $('msgBtn').textContent = btn; $('msg').classList.remove('hidden');
@@ -402,7 +401,7 @@ function finish() {
   $('predict').style.display = 'none';
   const best = Math.max(getBest(), S.score); setBest(best); $('best').textContent = best;
   showMsg('ภารกิจสำเร็จ!',
-    `คะแนนรวม <b>${S.score}</b> / 300<br>สถิติสูงสุดในเครื่องนี้ ${best}<br><br>
+    `คะแนนรวม <b>${S.score}</b> / 300<br>สถิติสูงสุด: ${best}<br><br>
      <b>ข้อควรระวัง:</b> ห้ามมองดวงอาทิตย์ด้วยตาเปล่าหรือผ่านกล้องโดยตรง
      ให้ใช้แว่นกรองแสงสำหรับดูดวงอาทิตย์โดยเฉพาะเท่านั้น`,
     'เล่นอีกครั้ง', () => { S.level = 0; S.score = 0; $('score').textContent = 0; startLevel(); });
@@ -417,9 +416,6 @@ $('predict').onclick = () => {
 };
 $('home').onclick = () => location.reload();
 
-/* =====================================================
-   ระบบกล้องและโหมดการเล่น
-   ===================================================== */
 const UA = navigator.userAgent;
 const ENV = {
   ios: /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
@@ -449,20 +445,14 @@ function settingSteps() {
     'แตะไอคอน <b>aA</b> ที่แถบที่อยู่เว็บ (ใน Safari)',
     'เลือก <b>การตั้งค่าเว็บไซต์</b> (Website Settings)',
     'ตั้ง <b>กล้อง</b> เป็น <b>อนุญาต</b>',
-    'ถ้าใช้ Chrome บน iPhone: ไปที่ <b>การตั้งค่า → Chrome → เปิดกล้อง</b>',
     'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
   ];
   if (ENV.android) return [
-    'แตะไอคอน <b>แม่กุญแจ</b> หรือ <b>ปรับแต่ง</b> ด้านซ้ายของแถบที่อยู่เว็บ',
+    'แตะไอคอน <b>แม่กุญแจ</b> ด้านซ้ายของแถบที่อยู่เว็บ',
     'เลือก <b>สิทธิ์</b> (Permissions) แล้วเลือก <b>กล้อง</b>',
-    'เลือก <b>อนุญาต</b>',
-    'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
+    'เลือก <b>อนุญาต</b> แล้วโหลดหน้าใหม่'
   ];
-  return [
-    'คลิกไอคอน <b>กล้อง</b> หรือ <b>แม่กุญแจ</b> ในแถบที่อยู่เว็บ',
-    'เลือก <b>อนุญาต</b> ให้ใช้กล้อง',
-    'กดปุ่มด้านล่างเพื่อโหลดหน้าใหม่'
-  ];
+  return ['คลิกไอคอนกล้องในแถบที่อยู่เว็บ แล้วเลือกอนุญาต'];
 }
 
 async function permState() {
@@ -470,7 +460,6 @@ async function permState() {
   catch { return 'unknown'; }
 }
 
-/* ขอกล้อง แล้วเข้าโหมดที่เลือก */
 async function tryCamera() {
   $('cam').classList.add('hidden');
   showLoading('กำลังขอสิทธิ์ใช้กล้อง...');
@@ -482,7 +471,6 @@ async function tryCamera() {
     if (S.mode === 'marker') { stream.getTracks().forEach(t => t.stop()); startAR(); }
     else startFree(stream);
   } catch (e) {
-    console.warn('Camera error:', e);
     hideLoading();
     handleCamError(e.name || 'Unknown');
   }
@@ -499,54 +487,24 @@ function handleCamError(code) {
   switch (code) {
     case 'NotAllowedError':
     case 'PermissionDeniedError':
-    case 'SecurityError':
       return camPanel({
         title: 'ยังไม่ได้รับอนุญาตให้ใช้กล้อง',
-        body: 'เปิดสิทธิ์กล้องได้ตามขั้นตอนนี้',
+        body: 'เปิดสิทธิ์กล้องได้ตามขั้นตอนนี้:',
         steps: settingSteps(),
         btn: 'โหลดหน้าใหม่', onBtn: reload,
         alt: 'ลองขอสิทธิ์อีกครั้ง', onAlt: tryCamera, noCam: true
       });
-    case 'NotFoundError':
-    case 'DevicesNotFoundError':
-    case 'OverconstrainedError':
-      return camPanel({
-        title: 'ไม่พบกล้อง',
-        body: 'อุปกรณ์นี้อาจไม่มีกล้อง หรือกล้องถูกปิดไว้',
-        btn: 'ลองอีกครั้ง', onBtn: tryCamera, noCam: true
-      });
-    case 'NotReadableError':
-    case 'TrackStartError':
-    case 'AbortError':
-      return camPanel({
-        title: 'กล้องถูกใช้งานอยู่',
-        body: 'ปิดแอปอื่นที่ใช้กล้องอยู่ก่อน เช่น แอปกล้อง วิดีโอคอล หรือ Zoom แล้วลองใหม่',
-        btn: 'ลองอีกครั้ง', onBtn: tryCamera, noCam: true
-      });
-    case 'insecure':
-      return camPanel({
-        title: 'ต้องเปิดผ่านลิงก์ที่ปลอดภัย',
-        body: 'เบราว์เซอร์อนุญาตให้ใช้กล้องเฉพาะเว็บที่ขึ้นต้นด้วย <b>https://</b>',
-        btn: 'เปิดลิงก์ HTTPS',
-        onBtn: () => location.href = location.href.replace(/^http:/, 'https:'), noCam: true
-      });
-    case 'unsupported':
-      return camPanel({
-        title: 'เบราว์เซอร์นี้ไม่รองรับกล้อง',
-        body: 'กรุณาเปิดด้วย <b>Chrome</b> (Android) หรือ <b>Safari</b> (iPhone/iPad) เวอร์ชันล่าสุด',
-        btn: 'ลองอีกครั้ง', onBtn: reload, noCam: true
-      });
     case 'arError':
       return camPanel({
         title: 'เปิดโหมดโปสเตอร์ไม่สำเร็จ',
-        body: 'อาจยังไม่มีไฟล์ targets.mind หรืออินเทอร์เน็ตช้า<br>เล่นโหมดไม่ใช้โปสเตอร์แทนได้เลย',
+        body: 'อาจยังไม่มีไฟล์ targets.mind หรือเบราว์เซอร์ไม่รองรับ',
         btn: 'เล่นแบบไม่ใช้โปสเตอร์', onBtn: switchToFree,
         alt: 'โหลดหน้าใหม่', onAlt: reload
       });
     default:
       return camPanel({
         title: 'เปิดกล้องไม่สำเร็จ',
-        body: `เกิดข้อผิดพลาด (${code})<br>ลองโหลดหน้าใหม่ หรือเปลี่ยนไปใช้เบราว์เซอร์อื่น`,
+        body: `เกิดข้อผิดพลาด (${code})`,
         btn: 'โหลดหน้าใหม่', onBtn: reload, noCam: true
       });
   }
@@ -557,22 +515,17 @@ function showInApp() {
   url.searchParams.set('openExternalBrowser', '1');
   camPanel({
     title: 'กรุณาเปิดในเบราว์เซอร์',
-    body: 'แอปที่คุณใช้เปิดลิงก์อยู่ (เช่น LINE หรือ Facebook) มักไม่อนุญาตให้เว็บใช้กล้อง',
-    steps: ENV.line
-      ? ['กดปุ่มด้านล่าง ระบบจะเปิดเกมใน Safari หรือ Chrome ให้อัตโนมัติ']
-      : ['แตะปุ่ม <b>⋯</b> ที่มุมขวาบน', 'เลือก <b>เปิดในเบราว์เซอร์</b> (Open in browser)'],
+    body: 'แอปที่คุณใช้เปิดลิงก์อยู่ (เช่น LINE หรือ Facebook) ไม่อนุญาตให้เว็บใช้กล้อง',
+    steps: ENV.line ? ['กดปุ่มด้านล่างเพื่อเปิดในเบราว์เซอร์หลัก'] : ['แตะปุ่ม <b>⋯</b> ขวาบน แล้วเลือกเปิดในเบราว์เซอร์'],
     btn: ENV.line ? 'เปิดในเบราว์เซอร์' : 'คัดลอกลิงก์',
-    onBtn: ENV.line
-      ? () => location.href = url.toString()
-      : async () => {
-          try { await navigator.clipboard.writeText(location.href); $('camBtn').textContent = 'คัดลอกแล้ว ✓'; }
-          catch { prompt('คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์', location.href); }
-        },
+    onBtn: ENV.line ? () => location.href = url.toString() : async () => {
+      try { await navigator.clipboard.writeText(location.href); $('camBtn').textContent = 'คัดลอกแล้ว ✓'; }
+      catch { prompt('คัดลอกลิงก์นี้ไปเปิดในเบราว์เซอร์', location.href); }
+    },
     alt: 'ลองเล่นในแอปนี้ต่อ', onAlt: () => beginCameraFlow(true), noCam: true
   });
 }
 
-/* ---------- โหมดเล่นทันที: ระบบสุริยะลอยหน้ากล้อง ---------- */
 function fitAnchor() {
   const aspect = innerWidth / innerHeight;
   const d = Math.max(1.6, 0.95 / (Math.tan(40 * Math.PI / 180) * aspect));
@@ -589,14 +542,13 @@ async function startFree(stream) {
   } else {
     document.body.classList.add('space');
   }
-  $('anchor').object3D.add($('system').object3D);   // ย้ายโมเดลมาไว้หน้ากล้อง
+  $('anchor').object3D.add($('system').object3D);
   $('anchor').setAttribute('visible', true);
   fitAnchor();
   S.found = true;
   enterGame();
 }
 
-/* ---------- โหมดโปสเตอร์ (MindAR) ---------- */
 function startAR() {
   S.mode = 'marker';
   showLoading('กำลังเปิดกล้องและโหลด AR...');
@@ -615,7 +567,6 @@ function startAR() {
   sc.hasLoaded ? go() : sc.addEventListener('loaded', go, { once: true });
 }
 
-/* ---------- ขั้นตอนหลังเลือกโหมด ---------- */
 async function beginCameraFlow(skipInAppCheck = false) {
   $('start').classList.add('hidden');
   $('cam').classList.add('hidden');
@@ -630,11 +581,8 @@ async function beginCameraFlow(skipInAppCheck = false) {
 
   camPanel({
     title: 'ขออนุญาตใช้กล้อง',
-    body: (S.mode === 'marker'
-            ? 'เกมใช้กล้องเพื่อส่องโปสเตอร์และแสดงระบบสุริยะ 3D'
-            : 'เกมใช้กล้องเป็นฉากหลัง ให้ระบบสุริยะลอยอยู่ตรงหน้าคุณ') +
-          '<br><small>ภาพจากกล้องใช้บนเครื่องของคุณเท่านั้น ไม่มีการบันทึกหรือส่งออกไปไหน</small>',
-    steps: ['กดปุ่มด้านล่าง', 'เมื่อมีหน้าต่างถาม ให้กด <b>อนุญาต</b> (Allow)'],
+    body: S.mode === 'marker' ? 'เกมใช้กล้องเพื่อส่องโปสเตอร์ AR' : 'เกมใช้กล้องเป็นฉากหลังอวกาศ',
+    steps: ['กดปุ่มด้านล่าง', 'เมื่อหน้าต่างเบราว์เซอร์เด้งขึ้นมา ให้กด <b>อนุญาต</b>'],
     btn: 'อนุญาตใช้กล้อง', onBtn: tryCamera, noCam: true
   });
 }
@@ -642,22 +590,19 @@ async function beginCameraFlow(skipInAppCheck = false) {
 $('btnFree').onclick   = () => { unlockAudio(); S.mode = 'free';   beginCameraFlow(); };
 $('btnMarker').onclick = () => { unlockAudio(); S.mode = 'marker'; beginCameraFlow(); };
 
-/* ตรวจว่ามีไฟล์ targets.mind หรือยัง */
 fetch('targets.mind', { method: 'HEAD', cache: 'no-store' })
   .then(r => { if (!r.ok) throw new Error(r.status); })
   .catch(() => {
     $('btnMarker').disabled = true;
-    $('markerNote').textContent = 'ยังใช้โหมดนี้ไม่ได้ เพราะยังไม่มีไฟล์ targets.mind (สร้างได้จากหน้า poster.html)';
+    $('markerNote').textContent = 'โหมดนี้ต้องใช้ไฟล์ targets.mind (สร้างได้จากหน้า poster.html)';
   });
 
-/* ---------- ตรวจจับ Marker ---------- */
 $('target').addEventListener('targetFound', () => { S.found = true;  $('lost').classList.add('hidden'); });
 $('target').addEventListener('targetLost',  () => {
   if (S.mode !== 'marker') return;
   S.found = false; if (S.state === 'play') $('lost').classList.remove('hidden');
 });
 
-/* ---------- Game loop ---------- */
 let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
